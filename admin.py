@@ -1,36 +1,82 @@
-#ratings/admin.py
+#recommender/admin.py
 from django.contrib import admin
-from .models import Rating
+from .models import ContentSimilarity, Recommendation
 
 
-@admin.register(Rating)
-class RatingAdmin(admin.ModelAdmin):
+@admin.register(ContentSimilarity)
+class ContentSimilarityAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "content_object_1",
+        "content_object_2",
+        "similarity_score",
+        "created_at",
+    )
+
+    list_filter = (
+        "content_type_1",
+        "content_type_2",
+        "created_at",
+    )
+
+    search_fields = (
+        "object_id_1",
+        "object_id_2",
+    )
+
+    readonly_fields = (
+        "content_type_1",
+        "object_id_1",
+        "content_type_2",
+        "object_id_2",
+        "similarity_score",
+        "created_at",
+    )
+
+    ordering = ("-similarity_score",)
+
+    def content_object_1(self, obj):
+        return obj.content1
+
+    content_object_1.short_description = "Content 1"
+
+    def content_object_2(self, obj):
+        return obj.content2
+
+    content_object_2.short_description = "Content 2"
+
+
+@admin.register(Recommendation)
+class RecommendationAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "user",
-        "file",
+        "content_object",
         "score",
         "created_at",
     )
 
     list_filter = (
-        "score",
+        "content_type",
         "created_at",
     )
 
     search_fields = (
         "user__email",
         "user__username",
-        "file__id",
-        "comment",
+        "object_id",
+        "reason",
     )
 
     readonly_fields = (
+        "content_type",
+        "object_id",
         "created_at",
-        "user",
-        "file",
     )
 
-    ordering = (
-        "-created_at",
-    )
+    ordering = ("-created_at",)
+
+    def content_object(self, obj):
+        return obj.content
+
+    content_object.short_description = "Content"

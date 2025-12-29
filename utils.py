@@ -1,14 +1,11 @@
-# files/utils.py
+#recommender/utils.py
+def normalize_scores(score_map):
+    if not score_map:
+        return {}
 
-from django.http import FileResponse
-import os
+    max_score = max(score_map.values()) or 1
 
-
-def serve_file(file_obj):
-    file_path = file_obj.file.path  # فرض: FileField به اسم file داری
-
-    return FileResponse(
-        open(file_path, "rb"),
-        as_attachment=True,
-        filename=os.path.basename(file_path),
-    )
+    return {
+        k: round(v / max_score, 4)
+        for k, v in score_map.items()
+    }
