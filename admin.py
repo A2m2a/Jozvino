@@ -1,33 +1,24 @@
-#requestsapp/admin.py
+#roles/admin.py
 from django.contrib import admin
-from .models import RoleUpgradeRequest
+from .models import Role
 
 
-@admin.register(RoleUpgradeRequest)
-class RequestAdmin(admin.ModelAdmin):
+@admin.register(Role)
+class RoleAdmin(admin.ModelAdmin):
     list_display = (
         "id",
-        "user",
-        "requested_role",
-        "status",
-        "created_at",
-    )
-
-    list_filter = (
-        "requested_role",
-        "status",
-        "created_at",
-    )
-
-    search_fields = (
-        "user__username",
-        "user__email",
-    )
-
-    readonly_fields = (
-        "created_at",
+        "name",
     )
 
     ordering = (
-        "-created_at",
+        "id",
     )
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
