@@ -1,59 +1,55 @@
-# files/models.py
+#handouts/models.py
 from django.db import models
-from django.db.models import Q
-from django.conf import settings
+from contents.models import AbstractContent
+from categories.models import Category
+from tags.models import Tag
 
 
-class File(models.Model):
-    FILE_TYPES = (
-        ("image", "Image"),
-        ("pdf", "PDF"),
-        ("epub", "EPUB"),
-        ("doc", "DOC"),
+class Handout(AbstractContent):
+    course_name = models.CharField(
+        max_length=255
     )
 
-    file = models.FileField(upload_to="files/")
-    file_type = models.CharField(
-        max_length=10,
-        choices=FILE_TYPES,
+    university = models.CharField(
+        max_length=255,
+        blank=True
     )
 
-    # Content relation (exactly one required)
-    book = models.ForeignKey(
-        "books.Book",
-        on_delete=models.CASCADE,
-        related_name="files",
-        null=True,
+    professor = models.CharField(
+        max_length=255,
+        blank=True
+    )
+
+    semester = models.CharField(
+        max_length=50,
+        blank=True
+    )
+
+    is_official = models.BooleanField(
+        default=False
+    )
+
+    # ✅ taxonomy مخصوص Handout (رفع E304 / E305)
+    categories = models.ManyToManyField(
+        Category,
+        related_name="handouts",
         blank=True,
     )
-    handout = models.ForeignKey(
-        "handouts.Handout",
-        on_delete=models.CASCADE,
-        related_name="files",
-        null=True,
+
+    tags = models.ManyToManyField(
+        Tag,
+        related_name="handouts",
         blank=True,
     )
 
-    uploader = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="uploaded_files",
-    )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
+    @property
+    def cover_image(self):
+        return self.files.filter(file_type="image").first()
+    
     class Meta:
         ordering = ["-created_at"]
-        constraints = [
-            models.CheckConstraint(
-                condition=(
-                    (Q(book__isnull=False) & Q(handout__isnull=True)) |
-                    (Q(book__isnull=True) & Q(handout__isnull=False))
-                ),
-                name="file_must_belong_to_exactly_one_content",
-            )
-        ]
+        verbose_name = "Handout"
+        verbose_name_plural = "Handouts"
 
     def __str__(self):
-        content = self.book or self.handout
-        return f"{self.file.name} ({content})"
+        return f"{self.title} - {self.course_name}"

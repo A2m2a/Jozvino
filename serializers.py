@@ -1,61 +1,55 @@
-# files/serializers.py
+# handouts/serializers.py
 from rest_framework import serializers
-from .models import File
+from .models import Handout
+from categories.serializers import CategorySerializer
+from tags.serializers import TagSerializer
+from files.serializers import FileSerializer
 
 
-class FileSerializer(serializers.ModelSerializer):
-    content_type = serializers.SerializerMethodField(read_only=True)
-    content_id = serializers.SerializerMethodField(read_only=True)
+class HandoutSerializer(serializers.ModelSerializer):
+    categories = CategorySerializer(many=True, read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+
+    # ✅ درست: related_name = "files"
+    files = FileSerializer(
+        many=True,
+        read_only=True
+    )
+
+    # ✅ کاور محاسبه‌ای
+    cover_image = serializers.SerializerMethodField()
 
     class Meta:
-        model = File
-        fields = [
+        model = Handout
+        fields = (
             "id",
-            "file",
-            "file_type",
-            "book",
-            "handout",
-            "content_type",
-            "content_id",
-            "uploader",
+            "title",
+            "description",
+            "publisher",
+            "course_name",
+            "university",
+            "professor",
+            "semester",
+            "is_official",
+            "categories",
+            "tags",
+            "files",
+            "cover_image",
+            "is_active",
             "created_at",
-        ]
-        read_only_fields = [
-            "uploader",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
             "created_at",
-            "content_type",
-            "content_id",
-        ]
+            "updated_at",
+        )
 
-    def get_content_type(self, obj):
-        if obj.book_id:
-            return "book"
-        if obj.handout_id:
-            return "handout"
-        return None
-
-    def get_content_id(self, obj):
-        return obj.book_id or obj.handout_id
-
-    def validate(self, attrs):
-        book = attrs.get("book")
-        handout = attrs.get("handout")
-
-        if book and handout:
-            raise serializers.ValidationError(
-                "File can be attached to either a book or a handout, not both."
-            )
-
-        if not book and not handout:
-            raise serializers.ValidationError(
-                "File must be attached to a book or a handout."
-            )
-
-        return attrs
-
-    def update(self, instance, validated_data):
-        if "book" in validated_data or "handout" in validated_data:
-            raise serializers.ValidationError(
-                "Changing file content association is not allowed."
-            )
-        return super().update(instance, validated_data)
+    def get_cover_image(self, obj):
+        """
+        اولین فایل image به‌عنوان کاور
+        """
+        file = obj.files.filter(file_type="image").first()
+        if not file:
+            return None
+        return FileSerializer(file, context=self.context).data

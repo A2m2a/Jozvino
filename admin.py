@@ -1,58 +1,58 @@
-# files/admin.py
+# handouts/admin.py
 from django.contrib import admin
-from .models import File
+from django.utils.html import format_html
+from contents.admin import ContentAdminMixin
+from .models import Handout
+from files.admin import FileInline
 
+@admin.register(Handout)
+class HandoutAdmin(ContentAdminMixin):
+    inlines = [FileInline]
 
-@admin.register(File)
-class FileAdmin(admin.ModelAdmin):
-    list_display = ("id", "file_type", "uploader", "created_at", "book", "handout")
-    list_filter = ("file_type", "created_at")
-    search_fields = ("uploader__email", "file")
-    ordering = ("-created_at",)
+    def save_formset(self, request, form, formset, change):
+        # مقداردهی uploader برای هر فایل جدید
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if not instance.uploader_id:
+                instance.uploader = request.user
+            instance.save()
+        formset.save_m2m()
 
-    readonly_fields = ("created_at", "uploader", "book", "handout")
+    def cover_preview(self, obj):
+        if obj.cover_image:
+            return format_html(
+                '<img src="{}" style="height:50px; object-fit:cover;" />',
+                obj.cover_image.file.url
+            )
+        return "-"
 
-    # ❌ Add از صفحه مستقیم بسته
-    def has_add_permission(self, request):
-        return False
+    cover_preview.short_description = "Cover"
 
-    # ✅ اجازه تغییر فقط از طریق Inline
-    def has_change_permission(self, request, obj=None):
-        if request.user.is_superuser:
-            return True
+    list_display = (
+        "id",
+        "title",
+        "course_name",
+        "cover_preview",
+        "university",
+        "professor",
+        "semester",
+        "is_official",
+        "created_at",
+    )
 
-        role = getattr(request.user.role, "name", None)
-        return role in ("admin", "editor")
+    list_filter = (
+        "is_official",
+        "semester",
+        "categories",
+        "tags",
+        "created_at",
+    )
 
-    def has_view_permission(self, request, obj=None):
-        if request.user.is_superuser:
-            return True
-
-        role = getattr(request.user.role, "name", None)
-        return role in ("admin", "editor")
-
-    def has_delete_permission(self, request, obj=None):
-        if request.user.is_superuser:
-            return True
-
-        role = getattr(request.user.role, "name", None)
-        return role == "admin"
-
-class FileInline(admin.TabularInline):
-    model = File
-    extra = 1
-    fields = ("file", "file_type")
-    can_delete = True
-
-    def has_add_permission(self, request, obj=None):
-        role = getattr(request.user.role, "name", None)
-        return request.user.is_staff and role in ("admin", "editor")
-
-    def has_change_permission(self, request, obj=None):
-        role = getattr(request.user.role, "name", None)
-        return request.user.is_staff and role in ("admin", "editor")
-
-    def get_formset(self, request, obj=None, **kwargs):
-        formset = super().get_formset(request, obj, **kwargs)
-        formset.form.base_fields["file_type"].initial = "image"
-        return formset
+    search_fields = (
+        "title",
+        "course_name",
+        "university",
+        "professor",
+        "description",
+    )
+    filter_horizontal = ("categories", "tags")

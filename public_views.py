@@ -1,17 +1,23 @@
-# books/public_views.py
+# handouts/public_views.py
+from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.permissions import AllowAny
+
+from .models import Handout
+from .serializers import HandoutSerializer
+
 
 from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.permissions import AllowAny
 
-from .models import Book
-from .serializers import BookSerializer
+from .models import Handout
+from .serializers import HandoutSerializer
 
 
-class PublicBookViewSet(ReadOnlyModelViewSet):
+class PublicHandoutViewSet(ReadOnlyModelViewSet):
     queryset = (
-        Book.objects
+        Handout.objects
         .filter(is_active=True)
         .prefetch_related("categories", "tags", "files")
     )
-    serializer_class = BookSerializer
+    serializer_class = HandoutSerializer
     permission_classes = [AllowAny]
