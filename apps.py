@@ -1,5 +1,5 @@
 from django.apps import AppConfig
 
 
-class RolesConfig(AppConfig):
-    name = 'roles'
+class SearchConfig(AppConfig):
+    name = 'search'

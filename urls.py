@@ -1,11 +1,11 @@
-# roles/urls.py
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import RoleViewSet
-
-router = DefaultRouter()
-router.register("roles", RoleViewSet, basename="roles")
+# search/urls.py
+from django.urls import path
+from .views import (
+    ContentSearchAPIView,
+    PublicContentSearchAPIView,
+)
 
 urlpatterns = [
-    path("", include(router.urls)),
+    path("contents/search/", ContentSearchAPIView.as_view()),
+    path("contents/search/public/", PublicContentSearchAPIView.as_view()),
 ]
