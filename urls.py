@@ -1,15 +1,12 @@
-# categories/urls.py
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import CategoryViewSet, CategoryTreeViewSet
+# contents/urls.py
 
-router = DefaultRouter()
-router.register(r'', CategoryViewSet, basename='category')
+from django.urls import path
+from .views import PublicContentFilterAPIView
 
 urlpatterns = [
-    # 🔹 tree باید قبل از router باشد
-    path('tree/', CategoryTreeViewSet.as_view({'get': 'list'}), name='category-tree'),
-
-    # 🔹 CRUD دسته‌بندی‌ها
-    path('', include(router.urls)),
+    path(
+        "contents/public/",
+        PublicContentFilterAPIView.as_view(),
+        name="public-content-filter",
+    ),
 ]

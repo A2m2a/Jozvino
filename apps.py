@@ -1,5 +1,5 @@
 from django.apps import AppConfig
 
 
-class CategoriesConfig(AppConfig):
-    name = 'categories'
+class ContentsConfig(AppConfig):
+    name = 'contents'

@@ -1,22 +1,37 @@
-# categories/models.py
+# contents/models.py
 from django.db import models
 
 
-class Category(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+class AbstractContent(models.Model):
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
 
-    parent = models.ForeignKey(
-        "self",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="children",
+    publisher = models.ForeignKey(
+        "publishers.Publisher",
+        on_delete=models.PROTECT,
+        related_name="%(class)ss"
     )
 
+    # ✅ Content-based taxonomy
+    categories = models.ManyToManyField(
+        "categories.Category",
+        related_name="contents",
+        blank=True,
+    )
+
+    tags = models.ManyToManyField(
+        "tags.Tag",
+        related_name="contents",
+        blank=True,
+    )
+
+    is_active = models.BooleanField(default=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ("name",)
+        abstract = True
 
     def __str__(self):
-        return self.name
+        return self.title
