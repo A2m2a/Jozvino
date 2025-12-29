@@ -1,87 +1,37 @@
-# books/views.py
+# categories/views.py
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
+from rest_framework.permissions import AllowAny
 
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework import status
-from django_filters.rest_framework import DjangoFilterBackend
-
-from .models import Book
-from .serializers import BookSerializer
-from .filters import BookFilter
-from categories.models import Category
-from tags.models import Tag
 from roles.permissions import RBACPermissionMixin
+from .models import Category
+from .serializers import CategorySerializer, CategoryTreeSerializer
 
-# ✅ NEW
-from recommender.models import UserInteraction
 
+# 🔹 CRUD دسته‌بندی‌ها (RBAC)
+class CategoryViewSet(RBACPermissionMixin, ModelViewSet):
+    queryset = Category.objects.all().order_by("-created_at")
+    serializer_class = CategorySerializer
 
-class BookViewSet(RBACPermissionMixin, ModelViewSet):
-    queryset = Book.objects.prefetch_related(
-        "categories",
-        "tags",
-        "file_set",
-    )
-    serializer_class = BookSerializer
-
-    # ✅ Filter
-    filter_backends = [DjangoFilterBackend]
-    filterset_class = BookFilter
-
-    # ✅ RBAC
+    # ✅ Single Source of Truth (LOCKED)
     rbac_permissions = {
-        "GET": {"roles": ["admin", "editor"]},
+        "GET": {"roles": ["admin", "editor", "viewer"]},
         "POST": {"roles": ["admin", "editor"]},
-        "PUT": {"roles": ["admin", "editor"], "owner_only": True},
-        "PATCH": {"roles": ["admin", "editor"], "owner_only": True},
+        "PUT": {"roles": ["admin", "editor"]},
+        "PATCH": {"roles": ["admin", "editor"]},
         "DELETE": {"roles": ["admin"]},
     }
 
-    # ✅ VIEW logging (Recommender)
-    def retrieve(self, request, *args, **kwargs):
-        response = super().retrieve(request, *args, **kwargs)
 
-        if request.user.is_authenticated:
-            UserInteraction.objects.create(
-                user=request.user,
-                content=self.get_object(),  # Book → AbstractContent ✅
-                action=UserInteraction.ACTION_VIEW,
-                weight=1.0,
-            )
+# 🔹 Tree API برای فرانت (Public)
+class CategoryTreeViewSet(ReadOnlyModelViewSet):
+    """
+    API درختی دسته‌بندی‌ها برای frontend (Next.js)
+    - public
+    - no pagination
+    """
+    serializer_class = CategoryTreeSerializer
+    permission_classes = [AllowAny]
+    pagination_class = None
 
-        return response
-
-    # ✅ Category Assignment
-    @action(
-        detail=True,
-        methods=["post", "delete"],
-        url_path="categories/(?P<category_id>[^/.]+)",
-    )
-    def manage_category(self, request, pk=None, category_id=None):
-        book = self.get_object()
-        category = Category.objects.get(pk=category_id)
-
-        if request.method == "POST":
-            book.categories.add(category)
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        book.categories.remove(category)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    # ✅ Tag Assignment
-    @action(
-        detail=True,
-        methods=["post", "delete"],
-        url_path="tags/(?P<tag_id>[^/.]+)",
-    )
-    def manage_tag(self, request, pk=None, tag_id=None):
-        book = self.get_object()
-        tag = Tag.objects.get(pk=tag_id)
-
-        if request.method == "POST":
-            book.tags.add(tag)
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        book.tags.remove(tag)
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    def get_queryset(self):
+        return Category.objects.filter(parent__isnull=True).prefetch_related("children")

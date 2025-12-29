@@ -1,12 +1,15 @@
+# categories/urls.py
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import BookViewSet
-from .public_views import PublicBookViewSet
+from .views import CategoryViewSet, CategoryTreeViewSet
 
 router = DefaultRouter()
-router.register(r"books", BookViewSet, basename="book")
-router.register(
-    r"public/books",
-    PublicBookViewSet,
-    basename="public-books",
-)
-urlpatterns = router.urls
+router.register(r'', CategoryViewSet, basename='category')
+
+urlpatterns = [
+    # 🔹 tree باید قبل از router باشد
+    path('tree/', CategoryTreeViewSet.as_view({'get': 'list'}), name='category-tree'),
+
+    # 🔹 CRUD دسته‌بندی‌ها
+    path('', include(router.urls)),
+]

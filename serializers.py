@@ -1,55 +1,41 @@
-# books/serializers.py
+# categories/serializers.py
 from rest_framework import serializers
-from .models import Book
-from categories.serializers import CategorySerializer
-from tags.serializers import TagSerializer
-from files.serializers import FileSerializer
+from .models import Category
 
 
-class BookSerializer(serializers.ModelSerializer):
-    categories = CategorySerializer(many=True, read_only=True)
-    tags = TagSerializer(many=True, read_only=True)
-
-    files = FileSerializer(
-        many=True,
-        read_only=True,
-        source="file_set"
-    )
-
-    cover_image = serializers.SerializerMethodField()
-
+class CategorySerializer(serializers.ModelSerializer):
+    """
+    ✅ Serializer عمومی (CRUD / Admin / Filter)
+    """
     class Meta:
-        model = Book
+        model = Category
         fields = (
             "id",
-            "title",
-            "description",
-            "publisher",
-            "pages",
-            "isbn",
-            "author",
-            "published_year",
-            "language",
-            "edition",
-            "categories",
-            "tags",
-            "files",
-            "cover_image",
-            "is_active",
+            "name",
             "created_at",
-            "updated_at",
         )
         read_only_fields = (
             "id",
             "created_at",
-            "updated_at",
         )
 
-    def get_cover_image(self, obj):
-        """
-        اولین فایل image به‌عنوان کاور
-        """
-        file = obj.files.filter(file_type="image").first()
-        if not file:
-            return None
-        return FileSerializer(file, context=self.context).data
+
+class CategoryTreeSerializer(serializers.ModelSerializer):
+    """
+    ✅ Serializer مخصوص منو / Navigation (Next.js)
+    فقط دسته‌های فرزند را به‌صورت بازگشتی برمی‌گرداند
+    """
+    children = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Category
+        fields = (
+            "id",
+            "name",
+            "children",
+        )
+
+    def get_children(self, obj):
+        # فقط یک سطح جلوتر ← recursion خودش ادامه می‌دهد
+        children = obj.children.all()
+        return CategoryTreeSerializer(children, many=True).data
