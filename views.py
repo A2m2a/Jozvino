@@ -1,125 +1,87 @@
-#accounts/views.py
-from rest_framework import viewsets, status
-from rest_framework.views import APIView
-from rest_framework.response import Response
+# books/views.py
+
+from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth import get_user_model
+from django_filters.rest_framework import DjangoFilterBackend
 
-from rest_framework.exceptions import ValidationError
-from .serializers import UserSerializer, RegisterSerializer,ChangePasswordSerializer
+from .models import Book
+from .serializers import BookSerializer
+from .filters import BookFilter
+from categories.models import Category
+from tags.models import Tag
 from roles.permissions import RBACPermissionMixin
-from .serializers import UserAvatarSerializer
 
-User = get_user_model()
-
-
-# 🔹 Public Register (NO RBAC)
-class RegisterView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-
-        return Response(
-            {
-                "id": user.id,
-                "email": user.email,
-                "role": user.role.name,
-            },
-            status=status.HTTP_201_CREATED,
-        )
+# ✅ NEW
+from recommender.models import UserInteraction
 
 
-# 🔹 Users (RBAC Controlled)
+class BookViewSet(RBACPermissionMixin, ModelViewSet):
+    queryset = Book.objects.prefetch_related(
+        "categories",
+        "tags",
+        "file_set",
+    )
+    serializer_class = BookSerializer
 
-class UserViewSet(RBACPermissionMixin, viewsets.ModelViewSet):
-    serializer_class = UserSerializer
-    queryset = User.objects.all()
+    # ✅ Filter
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = BookFilter
 
+    # ✅ RBAC
     rbac_permissions = {
-        "GET": {"roles": ["admin", "editor", "viewer"]},
-        "POST": {"roles": ["admin"]},
-        "PUT": {"roles": ["admin"]},
-        "PATCH": {"roles": ["admin"]},   # فقط ادمین روی همه
+        "GET": {"roles": ["admin", "editor"]},
+        "POST": {"roles": ["admin", "editor"]},
+        "PUT": {"roles": ["admin", "editor"], "owner_only": True},
+        "PATCH": {"roles": ["admin", "editor"], "owner_only": True},
         "DELETE": {"roles": ["admin"]},
-        "me": {
-            "GET": {"roles": ["admin", "editor", "viewer"]},
-            "PATCH": {"roles": ["admin", "editor", "viewer"]},  # ✅ کلیدی
-        },
     }
 
-    def get_queryset(self):
-        user = self.request.user
-        if user.role and user.role.name == "admin":
-            return User.objects.all()
-        return User.objects.filter(id=user.id)
+    # ✅ VIEW logging (Recommender)
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
 
-    @action(detail=False, methods=["get", "patch"])
-    def me(self, request):
-        if request.method == "GET":
-            serializer = self.get_serializer(request.user)
-            return Response(serializer.data)
-
-        serializer = self.get_serializer(
-            request.user,
-            data=request.data,
-            partial=True
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data)
-
-    @action(
-        detail=False,
-        methods=["patch"],
-        url_path="me/avatar",
-        permission_classes=[IsAuthenticated],
-    )
-    def update_avatar(self, request):
-        serializer = UserAvatarSerializer(
-            request.user,
-            data=request.data,
-            partial=True
-        )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        return Response({
-            "detail": "آواتار با موفقیت بروزرسانی شد",
-            "avatar": serializer.data["avatar"]
-        })
-
-class ChangePasswordView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        serializer = ChangePasswordSerializer(data=request.data)
-
-        try:
-            serializer.is_valid(raise_exception=True)
-        except ValidationError as e:
-            print("PASSWORD VALIDATION ERROR:", e.detail)
-            raise
-
-        user = request.user
-        old_password = serializer.validated_data["old_password"]
-
-        if not user.check_password(old_password):
-            print("OLD PASSWORD IS WRONG")
-            return Response(
-                {"detail": "رمز عبور فعلی اشتباه است"},
-                status=status.HTTP_400_BAD_REQUEST,
+        if request.user.is_authenticated:
+            UserInteraction.objects.create(
+                user=request.user,
+                content=self.get_object(),  # Book → AbstractContent ✅
+                action=UserInteraction.ACTION_VIEW,
+                weight=1.0,
             )
 
-        user.set_password(serializer.validated_data["new_password"])
-        user.save()
+        return response
 
-        return Response(
-            {"force_logout": True},
-            status=status.HTTP_200_OK,
-        )
+    # ✅ Category Assignment
+    @action(
+        detail=True,
+        methods=["post", "delete"],
+        url_path="categories/(?P<category_id>[^/.]+)",
+    )
+    def manage_category(self, request, pk=None, category_id=None):
+        book = self.get_object()
+        category = Category.objects.get(pk=category_id)
+
+        if request.method == "POST":
+            book.categories.add(category)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        book.categories.remove(category)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    # ✅ Tag Assignment
+    @action(
+        detail=True,
+        methods=["post", "delete"],
+        url_path="tags/(?P<tag_id>[^/.]+)",
+    )
+    def manage_tag(self, request, pk=None, tag_id=None):
+        book = self.get_object()
+        tag = Tag.objects.get(pk=tag_id)
+
+        if request.method == "POST":
+            book.tags.add(tag)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        book.tags.remove(tag)
+        return Response(status=status.HTTP_204_NO_CONTENT)
