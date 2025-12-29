@@ -1,43 +1,48 @@
-# reports/serializers.py
+# requestsapp/serializers.py
 from rest_framework import serializers
-from .models import Report
+
+from requestsapp.models import RoleUpgradeRequest
 
 
-class ReportSerializer(serializers.ModelSerializer):
-    reporter = serializers.PrimaryKeyRelatedField(read_only=True)
+class RoleUpgradeRequestSerializer(serializers.ModelSerializer):
+    # ✅ Readable output for frontend
+    requested_role_name = serializers.SerializerMethodField()
 
     class Meta:
-        model = Report
+        model = RoleUpgradeRequest
         fields = [
             "id",
-            "file",
-            "issue_type",
-            "description",
+            "user",                 # read-only (owner)
+            "requested_role",
+            "requested_role_name",  # ✅ human-readable
             "status",
-            "reporter",
             "created_at",
+            "reviewed_at",
         ]
+
         read_only_fields = [
             "id",
-            "reporter",
+            "user",
+            "status",
             "created_at",
+            "reviewed_at",
         ]
 
-    def validate_status(self, value):
-        """
-        Only admin can change report status.
-        """
-        request = self.context.get("request")
-
-        if request is None:
-            return value
-
+    # ✅ جلوگیری از ارسال چند درخواست pending
+    def validate(self, data):
+        request = self.context["request"]
         user = request.user
-        role = getattr(user.role, "name", None)
 
-        if role != "admin":
+        if RoleUpgradeRequest.objects.filter(
+            user=user,
+            status="pending"
+        ).exists():
             raise serializers.ValidationError(
-                "You are not allowed to change report status."
+                "You already have a pending role upgrade request."
             )
 
-        return value
+        return data
+
+    # ✅ Human-readable role name
+    def get_requested_role_name(self, obj):
+        return obj.requested_role.name

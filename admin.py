@@ -1,30 +1,27 @@
-#reports/admin.py
+#requestsapp/admin.py
 from django.contrib import admin
-from .models import Report
+from .models import RoleUpgradeRequest
 
 
-@admin.register(Report)
-class ReportAdmin(admin.ModelAdmin):
+@admin.register(RoleUpgradeRequest)
+class RequestAdmin(admin.ModelAdmin):
     list_display = (
         "id",
-        "file",
-        "reporter",
-        "issue_type",
+        "user",
+        "requested_role",
         "status",
         "created_at",
     )
 
     list_filter = (
+        "requested_role",
         "status",
-        "issue_type",
         "created_at",
     )
 
     search_fields = (
-        "file__title",
-        "user__email",
         "user__username",
-        "description",
+        "user__email",
     )
 
     readonly_fields = (

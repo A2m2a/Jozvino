@@ -1,8 +1,15 @@
-# reports/urls.py
+# requestsapp/urls.py
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ReportViewSet
+from .views import RoleUpgradeRequestViewSet
 
 router = DefaultRouter()
-router.register(r'reports', ReportViewSet, basename='report')
+router.register(
+    r'role-upgrade-requests',
+    RoleUpgradeRequestViewSet,
+    basename='role-upgrade-request'
+)
 
-urlpatterns = router.urls
+urlpatterns = [
+    path('', include(router.urls)),
+]

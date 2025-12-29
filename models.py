@@ -1,40 +1,26 @@
-# reports/models.py
+# requestsapp/models.py
 from django.db import models
 from django.conf import settings
-from files.models import File
+from roles.models import Role
 
 
-class Report(models.Model):
+class RoleUpgradeRequest(models.Model):
     STATUS_CHOICES = [
         ("pending", "Pending"),
-        ("resolved", "Resolved"),
+        ("approved", "Approved"),
         ("rejected", "Rejected"),
     ]
 
-    ISSUE_CHOICES = [
-        ("copyright", "Copyright violation"),
-        ("spam", "Spam or misleading"),
-        ("inappropriate", "Inappropriate content"),
-        ("quality", "Low quality"),
-        ("other", "Other"),
-    ]
-
-    reporter = models.ForeignKey(
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="reports"
+        related_name="role_requests"
     )
-    file = models.ForeignKey(
-        File,
+    requested_role = models.ForeignKey(
+        Role,
         on_delete=models.CASCADE,
-        related_name="reports"
+        related_name="upgrade_requests"
     )
-
-    issue_type = models.CharField(
-        max_length=32,
-        choices=ISSUE_CHOICES
-    )
-    description = models.TextField(blank=True)
 
     status = models.CharField(
         max_length=16,
@@ -43,10 +29,11 @@ class Report(models.Model):
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        unique_together = ("user", "requested_role")
         ordering = ["-created_at"]
-        unique_together = ("reporter", "file")
 
     def __str__(self):
-        return f"{self.reporter} → {self.file} ({self.status})"
+        return f"{self.user} → {self.requested_role} ({self.status})"
