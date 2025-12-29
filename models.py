@@ -1,37 +1,59 @@
-# contents/models.py
+# files/models.py
 from django.db import models
+from django.db.models import Q
+from django.conf import settings
 
 
-class AbstractContent(models.Model):
-    title = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-
-    publisher = models.ForeignKey(
-        "publishers.Publisher",
-        on_delete=models.PROTECT,
-        related_name="%(class)ss"
+class File(models.Model):
+    FILE_TYPES = (
+        ("image", "Image"),
+        ("pdf", "PDF"),
+        ("epub", "EPUB"),
+        ("doc", "DOC"),
     )
 
-    # ✅ Content-based taxonomy
-    categories = models.ManyToManyField(
-        "categories.Category",
-        related_name="contents",
+    file = models.FileField(upload_to="files/")
+    file_type = models.CharField(
+        max_length=10,
+        choices=FILE_TYPES,
+    )
+
+    # Content relation (exactly one required)
+    book = models.ForeignKey(
+        "books.Book",
+        on_delete=models.CASCADE,
+        related_name="files",
+        null=True,
+        blank=True,
+    )
+    handout = models.ForeignKey(
+        "handouts.Handout",
+        on_delete=models.CASCADE,
+        related_name="files",
+        null=True,
         blank=True,
     )
 
-    tags = models.ManyToManyField(
-        "tags.Tag",
-        related_name="contents",
-        blank=True,
+    uploader = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="uploaded_files",
     )
-
-    is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        abstract = True
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    (Q(book__isnull=False) & Q(handout__isnull=True)) |
+                    (Q(book__isnull=True) & Q(handout__isnull=False))
+                ),
+                name="file_must_belong_to_exactly_one_content",
+            )
+        ]
 
     def __str__(self):
-        return self.title
+        content = self.book or self.handout
+        return f"{self.file.name} ({content})"

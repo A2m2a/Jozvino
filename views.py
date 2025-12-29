@@ -1,64 +1,70 @@
-# contents/views_public.py
+# files/views.py
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.decorators import action
 
-from django.db.models import Avg, Count
-from rest_framework.generics import ListAPIView
-from rest_framework.permissions import AllowAny
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import SearchFilter, OrderingFilter
+from .models import File
+from .serializers import FileSerializer
+from .utils import serve_file
+from roles.permissions import RBACPermissionMixin
 
-from books.models import Book
-from handouts.models import Handout
-from .serializers_public import PublicContentSerializer
+from recommender.models import UserInteraction
 
 
-class PublicContentFilterAPIView(ListAPIView):
-    permission_classes = [AllowAny]
-    serializer_class = PublicContentSerializer
+class FileViewSet(RBACPermissionMixin, ModelViewSet):
+    serializer_class = FileSerializer
 
-    filter_backends = [
-        DjangoFilterBackend,
-        SearchFilter,
-        OrderingFilter,
-    ]
+    queryset = File.objects.select_related(
+        "book",
+        "handout",
+        "uploader",
+    )
 
-    filterset_fields = {
-        "publisher": ["exact"],
-        "categories": ["exact"],
-        "tags": ["exact"],
+    # ⛔️ No filters (content-based architecture)
+    filter_backends = []
+
+    # ✅ RBAC (LOCKED)
+    rbac_permissions = {
+        "GET": {"roles": ["admin", "editor", "viewer"]},
+        "POST": {"roles": ["admin", "editor"]},
+        "PUT": {"roles": ["admin", "editor"], "owner_only": True},
+        "PATCH": {"roles": ["admin", "editor"], "owner_only": True},
+        "DELETE": {"roles": ["admin"]},
     }
 
-    search_fields = ["title", "description"]
-    ordering_fields = ["created_at", "title"]
-
     def get_queryset(self):
-        books = (
-            Book.objects
-            .filter(is_active=True)
-            .annotate(
-                avg_rating=Avg("file_set__rating__score"),
-                files_count=Count("file_set", distinct=True),
+        """
+        Business-level filtering (after RBAC).
+        """
+        user = self.request.user
+        role = user.role.name
+
+        if role == "admin":
+            return self.queryset
+
+        if role == "viewer":
+            # viewers only see verified files
+            return self.queryset.filter(book__verified=True) | self.queryset.filter(handout__verified=True)
+
+        # editor → only own files
+        return self.queryset.filter(uploader=user)
+
+    def perform_create(self, serializer):
+        serializer.save(uploader=self.request.user)
+
+    # ✅ DOWNLOAD interaction (Recommender v1)
+    @action(detail=True, methods=["post"])
+    def download(self, request, pk=None):
+        file = self.get_object()
+
+        # ✅ AbstractContent resolution
+        content = file.book or file.handout
+
+        if request.user.is_authenticated:
+            UserInteraction.objects.create(
+                user=request.user,
+                content=content,
+                action=UserInteraction.ACTION_DOWNLOAD,
+                weight=3.0,
             )
-            .filter(files_count__gt=0)
-            .prefetch_related("categories", "tags")
-            .select_related("publisher")
-        )
 
-        for b in books:
-            b.type = "book"
-
-        handouts = (
-            Handout.objects
-            .filter(is_active=True)
-            .annotate(
-                avg_rating=Avg("file_set__rating__score"),
-                files_count=Count("file_set", distinct=True),
-            )
-            .filter(files_count__gt=0)
-            .prefetch_related("categories", "tags")
-            .select_related("publisher")
-        )
-
-        for h in handouts:
-            h.type = "handout"
-
-        return list(books) + list(handouts)
+        return serve_file(file)

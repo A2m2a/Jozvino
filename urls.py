@@ -1,12 +1,8 @@
-# contents/urls.py
+# files/urls.py
+from rest_framework.routers import DefaultRouter
+from .views import FileViewSet
 
-from django.urls import path
-from .views import PublicContentFilterAPIView
+router = DefaultRouter()
+router.register(r'', FileViewSet, basename='file')
 
-urlpatterns = [
-    path(
-        "contents/public/",
-        PublicContentFilterAPIView.as_view(),
-        name="public-content-filter",
-    ),
-]
+urlpatterns = router.urls

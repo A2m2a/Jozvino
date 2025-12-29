@@ -1,41 +1,61 @@
-# categories/serializers.py
+# files/serializers.py
 from rest_framework import serializers
-from .models import Category
+from .models import File
 
 
-class CategorySerializer(serializers.ModelSerializer):
-    """
-    ✅ Serializer عمومی (CRUD / Admin / Filter)
-    """
-    class Meta:
-        model = Category
-        fields = (
-            "id",
-            "name",
-            "created_at",
-        )
-        read_only_fields = (
-            "id",
-            "created_at",
-        )
-
-
-class CategoryTreeSerializer(serializers.ModelSerializer):
-    """
-    ✅ Serializer مخصوص منو / Navigation (Next.js)
-    فقط دسته‌های فرزند را به‌صورت بازگشتی برمی‌گرداند
-    """
-    children = serializers.SerializerMethodField()
+class FileSerializer(serializers.ModelSerializer):
+    content_type = serializers.SerializerMethodField(read_only=True)
+    content_id = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
-        model = Category
-        fields = (
+        model = File
+        fields = [
             "id",
-            "name",
-            "children",
-        )
+            "file",
+            "file_type",
+            "book",
+            "handout",
+            "content_type",
+            "content_id",
+            "uploader",
+            "created_at",
+        ]
+        read_only_fields = [
+            "uploader",
+            "created_at",
+            "content_type",
+            "content_id",
+        ]
 
-    def get_children(self, obj):
-        # فقط یک سطح جلوتر ← recursion خودش ادامه می‌دهد
-        children = obj.children.all()
-        return CategoryTreeSerializer(children, many=True).data
+    def get_content_type(self, obj):
+        if obj.book_id:
+            return "book"
+        if obj.handout_id:
+            return "handout"
+        return None
+
+    def get_content_id(self, obj):
+        return obj.book_id or obj.handout_id
+
+    def validate(self, attrs):
+        book = attrs.get("book")
+        handout = attrs.get("handout")
+
+        if book and handout:
+            raise serializers.ValidationError(
+                "File can be attached to either a book or a handout, not both."
+            )
+
+        if not book and not handout:
+            raise serializers.ValidationError(
+                "File must be attached to a book or a handout."
+            )
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        if "book" in validated_data or "handout" in validated_data:
+            raise serializers.ValidationError(
+                "Changing file content association is not allowed."
+            )
+        return super().update(instance, validated_data)

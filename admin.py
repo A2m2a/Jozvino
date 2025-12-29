@@ -1,66 +1,58 @@
-# contents/admin.py
+# files/admin.py
 from django.contrib import admin
+from .models import File
 
-class ContentAdminMixin(admin.ModelAdmin):
-    """
-    Base admin config for all content-based models (Book, Handout, ...)
-    """
 
-    list_filter = (
-        "publisher",
-        "categories",
-        "tags",
-        "is_active",
-        "created_at",
-    )
-    search_fields = (
-        "title",
-        "description",
-    )
-    filter_horizontal = ("categories", "tags")
+@admin.register(File)
+class FileAdmin(admin.ModelAdmin):
+    list_display = ("id", "file_type", "uploader", "created_at", "book", "handout")
+    list_filter = ("file_type", "created_at")
+    search_fields = ("uploader__email", "file")
+    ordering = ("-created_at",)
 
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("created_at", "uploader", "book", "handout")
 
-    # ----------------------------
-    # RBAC (shared) - اضافه کردن چک is_superuser در تمام توابع
-    # ----------------------------
+    # ❌ Add از صفحه مستقیم بسته
+    def has_add_permission(self, request):
+        return False
 
-    def has_module_permission(self, request):
-        # is_staff باید ماژول را ببیند
-        return request.user.is_authenticated and request.user.is_staff
+    # ✅ اجازه تغییر فقط از طریق Inline
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+
+        role = getattr(request.user.role, "name", None)
+        return role in ("admin", "editor")
 
     def has_view_permission(self, request, obj=None):
-        # سوپریوزر همیشه دسترسی دارد
         if request.user.is_superuser:
             return True
-            
-        role = getattr(request.user.role, "name", None)
-        # ادمین و ادیتور دسترسی مشاهده دارند
-        return role in ("admin", "editor")
 
-    def has_add_permission(self, request):
-        # سوپریوزر همیشه دسترسی دارد
-        if request.user.is_superuser:
-            return True
-            
         role = getattr(request.user.role, "name", None)
-        # ادمین و ادیتور دسترسی افزودن دارند
-        return role in ("admin", "editor")
-
-    def has_change_permission(self, request, obj=None):
-        # سوپریوزر همیشه دسترسی دارد
-        if request.user.is_superuser:
-            return True
-            
-        role = getattr(request.user.role, "name", None)
-        # ادمین و ادیتور دسترسی تغییر (ویرایش) دارند
         return role in ("admin", "editor")
 
     def has_delete_permission(self, request, obj=None):
-        # سوپریوزر همیشه دسترسی دارد
         if request.user.is_superuser:
             return True
-            
+
         role = getattr(request.user.role, "name", None)
-        # فقط ادمین اجازه حذف دارد
         return role == "admin"
+
+class FileInline(admin.TabularInline):
+    model = File
+    extra = 1
+    fields = ("file", "file_type")
+    can_delete = True
+
+    def has_add_permission(self, request, obj=None):
+        role = getattr(request.user.role, "name", None)
+        return request.user.is_staff and role in ("admin", "editor")
+
+    def has_change_permission(self, request, obj=None):
+        role = getattr(request.user.role, "name", None)
+        return request.user.is_staff and role in ("admin", "editor")
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        formset.form.base_fields["file_type"].initial = "image"
+        return formset

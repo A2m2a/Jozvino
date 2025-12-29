@@ -1,5 +1,5 @@
 from django.apps import AppConfig
 
 
-class ContentsConfig(AppConfig):
-    name = 'contents'
+class FilesConfig(AppConfig):
+    name = 'files'
