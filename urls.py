@@ -1,11 +1,8 @@
-# search/urls.py
-from django.urls import path
-from .views import (
-    ContentSearchAPIView,
-    PublicContentSearchAPIView,
-)
+# tags/urls.py
+from rest_framework.routers import DefaultRouter
+from .views import TagViewSet
 
-urlpatterns = [
-    path("contents/search/", ContentSearchAPIView.as_view()),
-    path("contents/search/public/", PublicContentSearchAPIView.as_view()),
-]
+router = DefaultRouter()
+router.register(r'tags', TagViewSet, basename='tag')
+
+urlpatterns = router.urls

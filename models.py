@@ -1,23 +1,13 @@
-# search/models.py
+# tags/models.py
 from django.db import models
 
-from accounts.models import User
 
-from files.models import File
+class Tag(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
-
-class SearchQuery(models.Model):
-
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-
-    query = models.CharField(max_length=255)
-
-    related_file = models.ForeignKey(File, on_delete=models.SET_NULL, null=True, blank=True)
-
-    count = models.IntegerField(default=1)
-
-    last_search = models.DateTimeField(auto_now=True)
-
+    class Meta:
+        ordering = ("name",)
 
     def __str__(self):
-        return f"{self.user} → {self.query}"
+        return self.name
