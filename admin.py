@@ -1,21 +1,36 @@
-#publishers/admin.py
+#ratings/admin.py
 from django.contrib import admin
-from .models import Publisher
+from .models import Rating
 
 
-@admin.register(Publisher)
-class PublisherAdmin(admin.ModelAdmin):
+@admin.register(Rating)
+class RatingAdmin(admin.ModelAdmin):
     list_display = (
         "id",
-        "name",
+        "user",
+        "file",
+        "score",
+        "created_at",
+    )
+
+    list_filter = (
+        "score",
         "created_at",
     )
 
     search_fields = (
-        "name",
-        "description",
+        "user__email",
+        "user__username",
+        "file__id",
+        "comment",
+    )
+
+    readonly_fields = (
+        "created_at",
+        "user",
+        "file",
     )
 
     ordering = (
-        "id",
+        "-created_at",
     )

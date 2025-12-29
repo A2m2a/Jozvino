@@ -1,5 +1,5 @@
 from django.apps import AppConfig
 
 
-class PublishersConfig(AppConfig):
-    name = 'publishers'
+class RatingsConfig(AppConfig):
+    name = 'ratings'
